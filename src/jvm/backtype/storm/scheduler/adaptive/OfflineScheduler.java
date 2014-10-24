@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import backtype.storm.scheduler.Cluster;
@@ -255,7 +256,7 @@ public class OfflineScheduler implements IScheduler {
 
 	@Override
 	public void prepare(Map conf) {
-		// TODO Auto-generated method stub
+		logger.setLevel(Level.INFO);
 		
 	}
 
