@@ -40,16 +40,16 @@ public class OfflineScheduler implements IScheduler {
 		
 		try {
 			for (TopologyDetails topology : topologies.getTopologies()) {
-				logger.debug("Checking topology " + topology.getName() + " (id: " + topology.getId() + ")");
+				logger.info("Checking topology " + topology.getName() + " (id: " + topology.getId() + ")");
 				if (cluster.needsScheduling(topology)) {
-					logger.debug("Topology " + topology.getId() + " needs rescheduling");
+					logger.info("Topology " + topology.getId() + " needs rescheduling");
 					// check if required data structures are included in topology conf
 					@SuppressWarnings("unchecked") List<String> componentList = (List<String>)topology.getConf().get("components");
 					// component -> list of input components
 					@SuppressWarnings("unchecked") Map<String, List<String>> streamMap = (Map<String, List<String>>)topology.getConf().get("streams");
 					if (componentList != null && streamMap != null) {
-						logger.debug("components: " + collectionToString(componentList));
-						logger.debug("streams: " + mapToString(streamMap));
+						logger.info("components: " + collectionToString(componentList));
+						logger.info("streams: " + mapToString(streamMap));
 						
 						float alfa = 0;
 						if (topology.getConf().get("alfa") != null)
@@ -60,10 +60,10 @@ public class OfflineScheduler implements IScheduler {
 						float epsilon = 0.5f;
 						if (topology.getConf().get("epsilon") != null)
 							epsilon = Float.parseFloat((String)topology.getConf().get("epsilon"));
-						logger.debug("alfa: " + alfa + ", beta: " + beta + ", epsilon: " + epsilon);
+						logger.info("alfa: " + alfa + ", beta: " + beta + ", epsilon: " + epsilon);
 						
 						// prepare the slots
-						logger.debug("Number of workers: " + topology.getNumWorkers());
+						logger.info("Number of workers: " + topology.getNumWorkers());
 						List<List<ExecutorDetails>> slotList = new ArrayList<List<ExecutorDetails>>();
 						for (int i = 0; i < topology.getNumWorkers(); i++)
 							slotList.add(new ArrayList<ExecutorDetails>());
@@ -73,7 +73,7 @@ public class OfflineScheduler implements IScheduler {
 						int min = (int)Math.ceil((double)executorCount/slotList.size());
 						int max = executorCount - slotList.size() + 1;
 						int maxExecutorPerSlot = min + (int)Math.ceil(alfa * (max - min));
-						logger.debug("Maximum number of executors per slot: " + maxExecutorPerSlot);
+						logger.info("Maximum number of executors per slot: " + maxExecutorPerSlot);
 						
 						// component -> list of its executors (already populated)
 						Map<String, List<ExecutorDetails>> componentToExecutorMap = cluster.getNeedsSchedulingComponentToExecutors(topology);
@@ -83,11 +83,11 @@ public class OfflineScheduler implements IScheduler {
 						
 						// iterate through the components, upstream to downstream
 						for (String component : componentList) {
-							logger.debug("Check for primary slots for component " + component);
+							logger.info("Check for primary slots for component " + component);
 							List<String> inputComponentList = streamMap.get(component);
-							logger.debug("input components: " + Utils.collectionToString(inputComponentList));
+							logger.info("input components: " + Utils.collectionToString(inputComponentList));
 							List<ExecutorDetails> executorList = componentToExecutorMap.get(component);
-							logger.debug("executors: " + Utils.collectionToString(executorList));
+							logger.info("executors: " + Utils.collectionToString(executorList));
 							
 							// identify primary slots and secondary slots
 							List<Integer> primarySlotList = new ArrayList<Integer>();
@@ -96,13 +96,13 @@ public class OfflineScheduler implements IScheduler {
 							if (inputComponentList != null) {
 								// for each input component, track the slots where related executors are currently assigned
 								for (String inputComponent : inputComponentList) {
-									logger.debug("Checking input component " + inputComponent);
+									logger.info("Checking input component " + inputComponent);
 									List<ExecutorDetails> inputExecutorList = componentToExecutorMap.get(inputComponent);
-									logger.debug("executors for input component " + inputComponent + ": " + Utils.collectionToString(inputExecutorList));
+									logger.info("executors for input component " + inputComponent + ": " + Utils.collectionToString(inputExecutorList));
 									for (ExecutorDetails inputExecutor : inputExecutorList) {
 										int slotIdx = executorToSlotMap.get(inputExecutor);
 										slotToUseMap.put(slotIdx, 1);
-										logger.debug("input executor " + inputExecutor + " is assigned to slot " + slotIdx + ", so this slot is a primary one");
+										logger.info("input executor " + inputExecutor + " is assigned to slot " + slotIdx + ", so this slot is a primary one");
 									}
 								}
 							}
@@ -122,7 +122,7 @@ public class OfflineScheduler implements IScheduler {
 							 * this way, we ensure that all the slots are used;
 							 * this is done after having already scheduled epsilon of the components
 							 */
-							logger.debug("this component index: " + componentList.indexOf(component) + ", index of component where to start forcing to use empty slots: " + (int)(epsilon * componentList.size()));
+							logger.info("this component index: " + componentList.indexOf(component) + ", index of component where to start forcing to use empty slots: " + (int)(epsilon * componentList.size()));
 							if (componentList.indexOf(component) >= (int)(epsilon * componentList.size()) ) {
 								List<Integer> slotToPromoteList = new ArrayList<Integer>();
 								for (int secondarySlot : secondarySlotList)
@@ -134,23 +134,23 @@ public class OfflineScheduler implements IScheduler {
 								}
 							}
 							
-							logger.debug("Primary slots for component " + component + ": " + Utils.collectionToString(primarySlotList));
-							logger.debug("Secondary slots for component " + component + ": " + Utils.collectionToString(secondarySlotList));
+							logger.info("Primary slots for component " + component + ": " + Utils.collectionToString(primarySlotList));
+							logger.info("Secondary slots for component " + component + ": " + Utils.collectionToString(secondarySlotList));
 							
 							int primaryIdx = 0;
 							int secondaryIdx = 0;
 							for (ExecutorDetails executor : executorList) {
-								logger.debug("Assigning executor " + executor);
+								logger.info("Assigning executor " + executor);
 								// assign executors to slots in a round-robin fashion
 								// if a primary slot is available (that is, enough available space for another executor), assign to the primary
 								// otherwise, assign to a secondary
 								int slotIdx = -1;
 								while (!primarySlotList.isEmpty() && slotList.get(primarySlotList.get(primaryIdx)).size() == maxExecutorPerSlot) {
-									logger.debug("Primary slot " + primarySlotList.get(primaryIdx) + " is full, remove it");
+									logger.info("Primary slot " + primarySlotList.get(primaryIdx) + " is full, remove it");
 									primarySlotList.remove(primaryIdx);
 									if (primaryIdx == primarySlotList.size()) {
 										primaryIdx = 0;
-										logger.debug("Reached the tail of primary slot list, point to the head");
+										logger.info("Reached the tail of primary slot list, point to the head");
 									}
 								}
 								if (!primarySlotList.isEmpty()) {
@@ -159,13 +159,13 @@ public class OfflineScheduler implements IScheduler {
 								}
 								
 								if (slotIdx == -1) {
-									logger.debug("No primary slot availble, choose a secondary slot");
+									logger.info("No primary slot availble, choose a secondary slot");
 									while (!secondarySlotList.isEmpty() && slotList.get(secondarySlotList.get(secondaryIdx)).size() == maxExecutorPerSlot) {
-										logger.debug("Secondary slot " + secondarySlotList.get(secondaryIdx) + " is full, remove it");
+										logger.info("Secondary slot " + secondarySlotList.get(secondaryIdx) + " is full, remove it");
 										secondarySlotList.remove(secondaryIdx);
 										if (secondaryIdx == secondarySlotList.size()) {
 											secondaryIdx = 0;
-											logger.debug("Reached the tail of secondary slot list, point to the head");
+											logger.info("Reached the tail of secondary slot list, point to the head");
 										}
 									}
 									if (!secondarySlotList.isEmpty()) {
@@ -178,7 +178,7 @@ public class OfflineScheduler implements IScheduler {
 									throw new Exception("Cannot assign executor " + executor + " to any slot");
 								slotList.get(slotIdx).add(executor);
 								executorToSlotMap.put(executor, slotIdx);
-								logger.debug("Assigned executor " + executor + " to slot " + slotIdx);
+								logger.info("Assigned executor " + executor + " to slot " + slotIdx);
 							}
 							
 						} /* end for (String component : componentList) */
@@ -256,8 +256,6 @@ public class OfflineScheduler implements IScheduler {
 
 	@Override
 	public void prepare(Map conf) {
-		logger.setLevel(Level.INFO);
-		
 	}
 
 }
